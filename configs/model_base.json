@@ -1,0 +1,10 @@
+{
+  "D": 512,
+  "d": 128,
+  "num_classes": 10,
+  "seg_len": 8,
+  "learning_rate": 0.001,
+  "batch_size": 16,
+  "dropout": 0.1,
+  "fps": 1.0
+}
