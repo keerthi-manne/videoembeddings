@@ -55,8 +55,8 @@ def load_fake_dataset(num_videos=50, T=30, D=512, num_classes=10):
 
 def load_real_dataset(samples_file: str, feature_dir: str, num_classes: int):
     """
-    Mode 2: Loads real CLIP features saved by Team A's extract_features.py
-    Each file: data/features/<video_id>.pt  → tensor (T, 512)
+    Mode 2a: Loads real CLIP features via samples.jsonl index.
+    Each file: data/features/<video_id>.pt → tensor (T, 512)
     """
     data = []
     with open(samples_file) as f:
@@ -67,11 +67,50 @@ def load_real_dataset(samples_file: str, feature_dir: str, num_classes: int):
         feat_path = os.path.join(feature_dir, f"{vid_id}.pt")
         if not os.path.exists(feat_path):
             continue
-        feat  = torch.load(feat_path)       # (T, 512)
-        label = i % num_classes             # pseudo label (hash of index)
+        feat  = torch.load(feat_path, weights_only=False)
+        if feat.dim() == 1:
+            feat = feat.unsqueeze(0)        # (D,) → (1, D)
+        if feat.shape[0] < 2:
+            continue                        # skip T=1, not useful for temporal model
+        label = i % num_classes
         data.append((feat, label))
 
     print(f"📂 Loaded {len(data)} real videos from {feature_dir}")
+    return data
+
+
+def load_embeddings_dir(feature_dir: str, num_classes: int, min_T: int = 2):
+    """
+    Mode 2b: Loads ALL .pt files directly from Team A's embeddings folder.
+    No samples.jsonl needed — just point at the folder.
+
+    Usage:
+        python training/train_st_adapter.py --feature_dir embeddings1
+    """
+    data = []
+    skipped = 0
+    files = sorted([f for f in os.listdir(feature_dir) if f.endswith('.pt')])
+
+    for i, fname in enumerate(files):
+        path = os.path.join(feature_dir, fname)
+        feat = torch.load(path, weights_only=False)
+
+        # Normalise shape
+        if feat.dim() == 1:
+            feat = feat.unsqueeze(0)        # (D,) → (1, D)
+        if feat.dim() != 2:
+            skipped += 1
+            continue
+        T, D = feat.shape
+        if T < min_T or D != 512:
+            skipped += 1
+            continue
+
+        label = i % num_classes
+        data.append((feat, label))
+
+    print(f"📂 Loaded {len(data)} usable videos from '{feature_dir}' "
+          f"(skipped {skipped} with T<{min_T} or wrong shape)")
     return data
 
 
@@ -110,8 +149,13 @@ def train(args):
     print("🚀 ST-Adapter Training")
 
     # Decide data mode
-    use_real = (args.feature_dir is not None and args.samples_file is not None
-                and os.path.exists(args.feature_dir) and os.path.exists(args.samples_file))
+    # Mode 2a: --feature_dir + --samples_file (Team A's final structured output)
+    # Mode 2b: --feature_dir only             (Team A's embeddings folder, no index needed)
+    # Mode 1:  nothing given                  (fake data for testing)
+    use_real_indexed = (args.feature_dir is not None and args.samples_file is not None
+                        and os.path.exists(args.feature_dir) and os.path.exists(args.samples_file))
+    use_real_dir     = (args.feature_dir is not None and args.samples_file is None
+                        and os.path.exists(args.feature_dir))
 
     config_path = args.config
     config = json.load(open(config_path))
@@ -119,11 +163,14 @@ def train(args):
     lr          = config["learning_rate"]
     batch_size  = config["batch_size"]
 
-    if use_real:
-        print(f"📂 Mode 2: Real features from {args.feature_dir}")
+    if use_real_indexed:
+        print(f"📂 Mode 2a: Real features via samples.jsonl from {args.feature_dir}")
         dataset = load_real_dataset(args.samples_file, args.feature_dir, num_classes)
+    elif use_real_dir:
+        print(f"📂 Mode 2b: Loading all .pt files directly from '{args.feature_dir}'")
+        dataset = load_embeddings_dir(args.feature_dir, num_classes, min_T=2)
     else:
-        print("🔧 Mode 1: Fake data (Team A features not yet available)")
+        print("🔧 Mode 1: Fake data (no --feature_dir given)")
         dataset = load_fake_dataset(num_videos=args.num_videos, num_classes=num_classes)
 
     train_data, val_data = split_dataset(dataset)

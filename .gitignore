@@ -6,6 +6,7 @@ data/meta/*.jsonl
 
 # Models
 checkpoints/
+!checkpoints/st_adapter_contrastive.pt
 *.pt
 *.pth
 
