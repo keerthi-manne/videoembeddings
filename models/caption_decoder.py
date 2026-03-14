@@ -236,7 +236,8 @@ def generate_captions_for_video(
     feat: torch.Tensor,
     decoder: "CaptionDecoder",
     seg_len: int = 8,
-    fps: float = 1.0
+    fps: float = 1.0,
+    dynamic: bool = True
 ) -> list:
     """
     Segment a video's feature tensor and caption each segment.
@@ -244,15 +245,31 @@ def generate_captions_for_video(
     Args:
         feat:    (T, 512) — enriched frame features (after STAdapter)
         decoder: CaptionDecoder instance
-        seg_len: frames per segment
+        seg_len: frames per segment (used if dynamic=False)
         fps:     frames per second
+        dynamic: if True, use similarity-based segmentation (Step 3 in Diagram)
 
     Returns:
         List of {"start", "end", "caption", "confidence"}
     """
-    import torch.nn.functional as _F
+    from models.event_head import dynamic_segmentation
     T = feat.shape[0]
 
+    if dynamic:
+        # Use the Architectural Diagram's similarity-based logic (Similarity < 0.8)
+        dyn_segments = dynamic_segmentation(feat, threshold=0.8)
+        results = []
+        for seg in dyn_segments:
+            caption, conf = decoder.decode(seg["feat"])
+            results.append({
+                "start":      round(seg["start_idx"] / fps, 2),
+                "end":        round(seg["end_idx"] / fps, 2),
+                "caption":    caption,
+                "confidence": conf
+            })
+        return results
+
+    # Legacy fixed-length segmentation
     # Short video: treat whole thing as one segment
     if T < seg_len:
         seg_feat        = feat.mean(dim=0)

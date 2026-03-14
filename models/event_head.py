@@ -46,6 +46,58 @@ def segment_features(
     
     return segments
 
+def dynamic_segmentation(
+    x: torch.Tensor, 
+    threshold: float = 0.8,
+    min_len: int = 4
+) -> List[dict]:
+    """
+    Step 3 from Architecture Diagram:
+    Iterates through time-aware features and splits when similarity < threshold.
+    
+    Args:
+        x: (T, D) single video features
+        threshold: 0.8 default
+        min_len: minimum frames to avoid tiny noise segments
+        
+    Returns:
+        List of indices where segments start and end.
+    """
+    T, D = x.shape
+    if T <= 1:
+        return [{"start_idx": 0, "end_idx": T}]
+
+    # Normalize for cosine similarity
+    x_norm = F.normalize(x, dim=-1)
+    
+    boundaries = [0]
+    curr_start = 0
+    
+    for i in range(1, T):
+        # Calculate similarity between current frame and the 'average' of current segment
+        # This is more robust than just checking frame-to-frame
+        seg_center = x_norm[curr_start:i].mean(dim=0)
+        seg_center = F.normalize(seg_center, dim=0)
+        
+        sim = (x_norm[i] @ seg_center).item()
+        
+        # If similarity drops, it's a new event!
+        if sim < threshold and (i - curr_start) >= min_len:
+            boundaries.append(i)
+            curr_start = i
+            
+    boundaries.append(T)
+    
+    segments = []
+    for i in range(len(boundaries)-1):
+        segments.append({
+            "start_idx": boundaries[i],
+            "end_idx": boundaries[i+1],
+            "feat": x[boundaries[i]:boundaries[i+1]].mean(dim=0) # Average feature for the segment
+        })
+        
+    return segments
+
 class EventHead(nn.Module):
     def __init__(self, config_path: str = 'configs/model_base.json'):
         super().__init__()
