@@ -4,7 +4,7 @@ from ImageEmbedding import process_image
 import torch
 import clip
 from PIL import Image
-
+import time
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model, preprocess = clip.load("ViT-B/32", device=device)
 
@@ -66,13 +66,16 @@ def video_to_frames(video_path, threshold=0.5):
 #     scores = (video_feat @ text_features.T).squeeze()
 
 #     return scores
-
-# video_emb = video_to_frames("3195394-uhd_3840_2160_25fps.mp4")
-# torch.save(video_emb , "sample_embed.pt")
+# start = time.time()
+# video_emb = video_to_frames("Dtrailer.mp4")
+# print(len(video_emb))
+# end = time.time()
+# print("P time is " , end - start , "seconds")
+torch.save(video_emb , "sample_embed.pt")
 for vid_num in range( 1000 , 1302) : 
     try : 
         video_emb = video_to_frames(f"./Video_embeddings/videos/video{vid_num}.mp4")
-        torch.save(video_emb , f"./Video_embeddings/embeddings/video{vid_num}.pt")  
+        torch.save(video_emb , f"./Video_embeddings/embeddings_new/video{vid_num}.pt")  
     except:
         continue  
 
