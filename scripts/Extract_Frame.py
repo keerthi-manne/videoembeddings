@@ -2,98 +2,103 @@ import cv2
 import json
 import os
 import sys
+import time 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# from models.SmolVLM import VLM_Generation
 from models.VLM_Generation import VLM_Generation
-# -------- CONFIG --------
 VIDEO_DIR = "Video_embeddings/Videos"
 JSON_FILE = "data/video_event_captions.jsonl"
-OUTPUT_JSON_FILE = "data/video_event_new_captions.jsonl"
+OUTPUT_JSON_FILE = "data/video_event_final_captions.jsonl"
 
 VLM = VLM_Generation()
-
-
-# -------- UTILS --------
+BATCH_SIZE = 16
 def time_to_seconds(t):
     return float(t.replace("s", ""))
 
 
-def extract_frame_caption(video_path, timestamp, prompt):
-    cap = cv2.VideoCapture(video_path)
-
-    if not cap.isOpened():
-        print(f"❌ Cannot open video: {video_path}")
-        return None
-
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    frame_count = cap.get(cv2.CAP_PROP_FRAME_COUNT)
-
-    duration = frame_count / fps if fps > 0 else 0
-
-    # 🔥 Skip invalid timestamps
+def extract_frame(cap, timestamp, duration):
     if timestamp > duration:
-        print(f"⚠️ Skipping {timestamp}s (video length: {duration:.2f}s)")
-        cap.release()
         return None
 
-    # 🔥 Better seeking
     cap.set(cv2.CAP_PROP_POS_MSEC, timestamp * 1000)
-
     success, frame = cap.read()
 
     if not success:
-        print(f"❌ Failed at {timestamp}s for {video_path}")
-        cap.release()
         return None
 
-    caption = VLM.generate_caption(frame, prompt)
+    frame = cv2.resize(frame, (224, 224))
+    return frame
 
-    cap.release()
-    return caption
+def run_Caption_pipeline() : 
+    with open(JSON_FILE, "r") as fin, open(OUTPUT_JSON_FILE, "w") as fout:
 
+        for line in fin:
+            data = json.loads(line.strip())
 
-# -------- MAIN LOOP --------
-with open(JSON_FILE, "r") as fin, open(OUTPUT_JSON_FILE, "w") as fout:
+            video_id = data["video_id"]
+            video_path = os.path.join(VIDEO_DIR, f"{video_id}.mp4")
 
-    for line in fin:
-        data = json.loads(line.strip())
+            cap = cv2.VideoCapture(video_path)
 
-        video_id = data["video_id"]
-        video_path = os.path.join(VIDEO_DIR, f"{video_id}.mp4")
+            if not cap.isOpened():
+                print(f"❌ Cannot open video: {video_path}")
+                continue
 
-        new_timeline = []
+            fps = cap.get(cv2.CAP_PROP_FPS)
+            frame_count = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+            duration = frame_count / fps if fps > 0 else 0
 
-        for i, segment in enumerate(data["timeline"]):
-            start = time_to_seconds(segment["start"])
-            end = time_to_seconds(segment["end"])
-            confidence = segment["confidence"]
-            label = segment["caption"]
+            new_timeline = []
 
-            # smarter prompt usage
-            prompt = label if confidence > 0.4 else None
+            batch_frames = []
+            batch_meta = []
 
-            mid = (start + end) / 2.0
+            for segment in data["timeline"]:
+                start = time_to_seconds(segment["start"])
+                end = time_to_seconds(segment["end"])
+                # confidence = segment["confidence"]
+                # label = segment["caption"]
+                mid = (start + end) / 2.0
+                frame = extract_frame(cap, mid, duration)
 
-            new_caption = extract_frame_caption(
-                video_path, mid, prompt
-            )
+                if frame is None:
+                    # new_caption = label
+                    new_timeline.append({
+                        "start": segment["start"],
+                        "end": segment["end"],
+                        # "old_caption": label,
+                        "caption": "No caption Available"
+                    })
+                    continue
+                batch_frames.append(frame)
+                batch_meta.append((segment))
 
-            # fallback if model fails
-            if new_caption is None:
-                new_caption = label
+                if len(batch_frames) == BATCH_SIZE:
+                    captions = VLM.generate_batch(batch_frames)
 
-            new_segment = {
-                "start": segment["start"],
-                "end": segment["end"],
-                "old_caption": label,
-                "new_caption": new_caption,
-                "confidence": confidence
-            }
+                    for cap_text, (seg) in zip(captions, batch_meta):
+                        new_timeline.append({
+                            "start": seg["start"],
+                            "end": seg["end"],
+                            "caption": cap_text
+                        })
 
-            new_timeline.append(new_segment)
+                    batch_frames.clear()
+                    batch_meta.clear()
 
-        output_data = {
-            "video_id": video_id,
-            "timeline": new_timeline
-        }
+            if batch_frames:
+                captions = VLM.generate_batch(batch_frames)
 
-        fout.write(json.dumps(output_data) + "\n")
+                for cap_text, (seg) in zip(captions, batch_meta):
+                    new_timeline.append({
+                        "start": seg["start"],
+                        "end": seg["end"],
+                        "caption": cap_text
+                    })
+
+            cap.release()
+
+            fout.write(json.dumps({
+                "video_id": video_id,
+                "timeline": new_timeline
+            }) + "\n")

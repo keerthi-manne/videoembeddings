@@ -2,54 +2,39 @@ import torch
 from transformers import BlipProcessor, BlipForConditionalGeneration
 from PIL import Image
 import cv2
-class VLM_Generation() : 
-    # Load model (use base version for efficiency)
-    def __init__(self, config_path: str = 'configs/model_base.json'):
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
+class VLM_Generation():
+    def __init__(self):
         self.processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
         self.model = BlipForConditionalGeneration.from_pretrained(
             "Salesforce/blip-image-captioning-base"
-        ).to(self.device)
-        self.model.eval()
-    def generate_caption(self, image, prompt=None):
-        """
-        image: can be numpy array (OpenCV) OR PIL image
-        """
-        if isinstance(image, Image.Image):
-            raw_image = image
-        else:
-            image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-            raw_image = Image.fromarray(image_rgb)
-
-        # Process input
-        if prompt:
-            inputs = self.processor(raw_image, text=prompt, return_tensors="pt").to(self.device)
-        else:
-            inputs = self.processor(raw_image, return_tensors="pt").to(self.device)
-
-        out = self.model.generate(
-            **inputs,
-            max_length=20,
-            num_beams=3
         )
 
-        caption = self.processor.decode(out[0], skip_special_tokens=True)
-        return caption
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.model.to(self.device)
 
-# if __name__ == "__main__":
-#     VLM = VLM_Generation()
-#     image_path = "test.jpg"
 
-#     # Example classifier output
-#     label = "tree"
-#     confidence = 0.3
 
-#     if confidence > 0.4:
-#         prompt = f"{label}"
-#     else:
-#         prompt = None
+    def generate_batch(self, images):
+        pil_images = []
 
-#     caption = VLM.generate_caption(image_path, prompt)
+        for img in images:
+            if not isinstance(img, Image.Image):
+                img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                img = Image.fromarray(img)
+            pil_images.append(img)
 
-#     print("Generated Caption:", caption)
+        inputs = self.processor(images=pil_images, return_tensors="pt").to(self.device)
+
+        with torch.no_grad():
+            output_ids = self.model.generate(
+                **inputs,
+                max_length=16,
+                num_beams=1
+            )
+
+        # 🔥 Decode captions
+        captions = self.processor.batch_decode(output_ids, skip_special_tokens=True)
+        captions = [c.strip() for c in captions]
+
+        return captions
