@@ -20,7 +20,7 @@ import sys
 import json
 import argparse
 from tqdm import tqdm
-
+from Extract_Frame import run_Caption_pipeline
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from models.st_adapter       import STAdapter
@@ -125,8 +125,8 @@ def build_index(args):
             # Calculate segment feature by averaging frames in segment
             seg_feat = feat_enriched[start_f:end_f+1].mean(dim=0)  # (512,)
             
-            # Step 4: Caption Generation
-            caption, conf = decoder.decode(seg_feat)
+            # # Step 4: Caption Generation
+            # caption, conf = decoder.decode(seg_feat)
             
             # Step 5 & 6 Info Prep
             start_time = round(start_f / fps, 2)
@@ -134,9 +134,9 @@ def build_index(args):
             
             timeline.append({
                 "start":      f"{start_time}s",
-                "end":        f"{end_time}s",
-                "caption":    caption,
-                "confidence": conf
+                "end":        f"{end_time}s"
+                # "caption":    caption,
+                # "confidence": conf
             })
             
             # Add to search index database
@@ -160,7 +160,9 @@ def build_index(args):
             
     # Save Feature Index for Search (Step 6)
     torch.save(retrieval_index, "data/retrieval_index.pt")
-
+    # Get the captions and save it (Step 7)
+    print("starting caption pipeline")
+    run_Caption_pipeline()
     print(f"\n✅ Done! Captioned timelines saved → data/video_event_captions.jsonl")
     print(f"✅ Fast search index saved → data/retrieval_index.pt")
     print(f"   Indexed {len(retrieval_index)} total segment events across {len(jsonl_results)} videos.\n")
