@@ -6,6 +6,7 @@ import cv2
 class VLM_Generation():
     def __init__(self):
         self.processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
+        self.processor.tokenizer.padding_side = "left"
         self.model = BlipForConditionalGeneration.from_pretrained(
             "Salesforce/blip-image-captioning-base"
         )
@@ -15,22 +16,22 @@ class VLM_Generation():
 
 
 
-    def generate_batch(self, images):
+    def generate_batch(self, images , prompts ):
         pil_images = []
-
         for img in images:
             if not isinstance(img, Image.Image):
                 img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
                 img = Image.fromarray(img)
             pil_images.append(img)
-
-        inputs = self.processor(images=pil_images, return_tensors="pt").to(self.device)
+        inputs = self.processor(images=pil_images, text = prompts  , return_tensors="pt" , padding = True , truncation = True ).to(self.device)
 
         with torch.no_grad():
             output_ids = self.model.generate(
                 **inputs,
-                max_length=16,
-                num_beams=1
+                max_length=30,
+                num_beams=3,
+                repetition_penalty=1.2,
+                no_repeat_ngram_size=2
             )
 
         # 🔥 Decode captions

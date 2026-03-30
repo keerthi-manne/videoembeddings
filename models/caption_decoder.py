@@ -32,137 +32,216 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # ── Candidate captions (100 common video activity descriptions) ──────────────
 # These cover the types of scenes found in MSR-VTT (general video dataset)
-CANDIDATE_CAPTIONS = [
-    # Cooking & food
-    "a person chopping vegetables",
-    "someone cooking food in a kitchen",
-    "a person frying food in a pan",
-    "placing food into a pot",
-    "stirring food while cooking",
-    "a person eating food",
-    "someone baking in an oven",
-    "a person washing dishes",
-    "someone preparing ingredients",
-    "a person grilling meat outdoors",
+# CANDIDATE_CAPTIONS = [
+#     # Cooking & food
+#     "a person chopping vegetables",
+#     "someone cooking food in a kitchen",
+#     "a person frying food in a pan",
+#     "placing food into a pot",
+#     "stirring food while cooking",
+#     "a person eating food",
+#     "someone baking in an oven",
+#     "a person washing dishes",
+#     "someone preparing ingredients",
+#     "a person grilling meat outdoors",
 
-    # Sports & exercise
-    "a person running outdoors",
-    "someone playing football",
-    "a person playing basketball",
-    "someone swimming in a pool",
-    "a person cycling on a road",
-    "someone doing yoga or stretching",
-    "a person lifting weights",
-    "someone playing tennis",
-    "a person jumping or doing gymnastics",
-    "someone skateboarding",
+#     # Sports & exercise
+#     "a person running outdoors",
+#     "someone playing football",
+#     "a person playing basketball",
+#     "someone swimming in a pool",
+#     "a person cycling on a road",
+#     "someone doing yoga or stretching",
+#     "a person lifting weights",
+#     "someone playing tennis",
+#     "a person jumping or doing gymnastics",
+#     "someone skateboarding",
+
+#     # Indoor activities
+#     "a person sitting and talking",
+#     "someone typing on a computer",
+#     "a person reading a book",
+#     "someone watching television",
+#     "a person using a phone",
+#     "someone playing a musical instrument",
+#     "a person painting or drawing",
+#     "someone doing household chores",
+#     "a person sleeping or resting",
+#     "someone working at a desk",
+
+#     # Outdoor & travel
+#     "a person walking on a street",
+#     "someone hiking in nature",
+#     "a person at the beach",
+#     "someone in a park or garden",
+#     "a person driving a car",
+#     "someone riding a motorcycle",
+#     "a person on public transportation",
+#     "someone at an airport",
+#     "a person shopping in a store",
+#     "someone at a restaurant",
+
+#     # Social & entertainment
+#     "a group of people talking",
+#     "someone dancing",
+#     "a person at a party or celebration",
+#     "someone playing a video game",
+#     "a person giving a presentation",
+#     "someone laughing and smiling",
+#     "a person hugging or greeting someone",
+#     "someone taking a photograph",
+#     "a group of people eating together",
+#     "someone singing",
+
+#     # Animals & nature
+#     "a dog playing or running",
+#     "a cat sitting or sleeping",
+#     "birds flying in the sky",
+#     "animals in a zoo or wildlife",
+#     "a person playing with a pet",
+
+#     # Construction & work
+#     "a person building or fixing something",
+#     "someone using tools or machinery",
+#     "a person cleaning or tidying up",
+#     "someone gardening outdoors",
+#     "a person carrying or moving objects",
+
+#     # Water activities
+#     "a person fishing",
+#     "someone surfing waves",
+#     "a person rowing a boat",
+#     "someone playing in water",
+#     "a person at a waterfall or river",
+
+#     # Music & performance
+#     "a person playing guitar",
+#     "someone playing piano",
+#     "a band performing on stage",
+#     "someone doing a magic trick",
+#     "a person performing on stage",
+
+#     # Children & family
+#     "children playing outdoors",
+#     "a baby or toddler doing something",
+#     "a family spending time together",
+#     "someone helping a child",
+#     "children in a classroom",
+
+#     # Medical & science
+#     "a person in a laboratory",
+#     "someone receiving medical treatment",
+#     "a doctor or nurse working",
+#     "someone doing an experiment",
+#     "a person using scientific equipment",
+
+#     # Urban & city life
+#     "cars moving on a busy road",
+#     "a city street with people walking",
+#     "someone at a market or bazaar",
+#     "a person in a crowded place",
+#     "someone at a sports stadium",
+
+#     # Art & crafts
+#     "a person making handicrafts",
+#     "someone knitting or sewing",
+#     "a person sculpting or molding",
+#     "someone doing calligraphy or writing",
+#     "a person doing origami or folding",
+
+#     # Generic descriptions (fallback)
+#     "a person doing an activity",
+#     "someone outdoors in daylight",
+#     "an indoor scene with people",
+#     "a person moving around",
+#     "a close-up of an object or face",
+#     "a person demonstrating something",
+#     "someone interacting with objects",
+#     "an outdoor nature scene",
+#     "a sports or fitness activity",
+#     "a cooking or food-related scene",
+# ]
+
+CANDIDATE_CAPTIONS = [
+
+    # Motion (extended)
+    "running", "walking", "jogging", "sprinting", "jumping", "climbing",
+    "falling", "sliding", "crawling", "rolling", "turning", "spinning",
+
+    # Vehicle & transport
+    "driving", "accelerating", "braking", "parking", "reversing",
+    "riding", "riding", "flying", "landing",
+    "boarding", "exiting",
+
+    # Object interaction
+    "holding", "grabbing", "picking up", "placing", "dropping",
+    "throwing", "catching", "passing", "lifting", "carrying",
+    "opening", "closing", "locking", "unlocking",
+    "pushing", "pulling", "pressing", "tapping",
+
+    # Tools / work / engineering
+    "repairing", "fixing", "building", "assembling", "disassembling",
+    "cutting", "drilling", "hammering", "screwing", "welding",
+    "testing", "measuring", "inspecting", "adjusting", "installing",
+
+    # Cooking (expanded)
+    "cooking", "chopping", "cutting", "slicing",
+    "stirring", "mixing", "pouring", "frying", "boiling",
+    "baking", "grilling", "serving", "plating",
+    "tasting", "eating", "washing",
+
+    # Human interaction / communication
+    "talking", "speaking", "explaining", "presenting",
+    "demonstrating", "teaching", "instructing",
+    "listening", "arguing", "laughing", "smiling",
+    "greeting", "shaking hands", "hugging",
 
     # Indoor activities
-    "a person sitting and talking",
-    "someone typing on a computer",
-    "a person reading a book",
-    "someone watching television",
-    "a person using a phone",
-    "someone playing a musical instrument",
-    "a person painting or drawing",
-    "someone doing household chores",
-    "a person sleeping or resting",
-    "someone working at a desk",
+    "typing", "clicking", "scrolling",
+    "reading", "writing", "drawing",
+    "watching", "browsing",
+    "using a phone", "using a computer",
 
-    # Outdoor & travel
-    "a person walking on a street",
-    "someone hiking in nature",
-    "a person at the beach",
-    "someone in a park or garden",
-    "a person driving a car",
-    "someone riding a motorcycle",
-    "a person on public transportation",
-    "someone at an airport",
-    "a person shopping in a store",
-    "someone at a restaurant",
+    # Sports & fitness
+    "playing", "playing", "playing",
+    "playing", "playing badminton",
+    "swimming", "cycling", "running",
+    "lifting", "exercising", "stretching", "kicking", "throwing a ball",
 
-    # Social & entertainment
-    "a group of people talking",
-    "someone dancing",
-    "a person at a party or celebration",
-    "someone playing a video game",
-    "a person giving a presentation",
-    "someone laughing and smiling",
-    "a person hugging or greeting someone",
-    "someone taking a photograph",
-    "a group of people eating together",
-    "someone singing",
+    # Entertainment / media
+    "dancing", "singing", "performing",
+    "playing music", "playing", "playing",
+    "acting", "recording", "filming",
 
-    # Animals & nature
-    "a dog playing or running",
-    "a cat sitting or sleeping",
-    "birds flying in the sky",
-    "animals in a zoo or wildlife",
-    "a person playing with a pet",
-
-    # Construction & work
-    "a person building or fixing something",
-    "someone using tools or machinery",
-    "a person cleaning or tidying up",
-    "someone gardening outdoors",
-    "a person carrying or moving objects",
+    # Animals
+    "dog running", "dog jumping", "cat walking",
+    "animal running", "animal eating", "animal playing",
 
     # Water activities
-    "a person fishing",
-    "someone surfing waves",
-    "a person rowing a boat",
-    "someone playing in water",
-    "a person at a waterfall or river",
+    "swimming", "diving", "surfing", "rowing",
+    "splashing", "floating", "washing",
 
-    # Music & performance
-    "a person playing guitar",
-    "someone playing piano",
-    "a band performing on stage",
-    "someone doing a magic trick",
-    "a person performing on stage",
+    # Office / daily work
+    "working", "organizing", "arranging",
+    "cleaning", "wiping", "packing", "unpacking",
+    "sorting", "checking",
 
-    # Children & family
-    "children playing outdoors",
-    "a baby or toddler doing something",
-    "a family spending time together",
-    "someone helping a child",
-    "children in a classroom",
+    # Shopping / daily life
+    "shopping", "paying", "selecting items",
+    "carrying groceries", "waiting in line",
 
-    # Medical & science
-    "a person in a laboratory",
-    "someone receiving medical treatment",
-    "a doctor or nurse working",
-    "someone doing an experiment",
-    "a person using scientific equipment",
+    # Construction / physical work
+    "digging", "lifting materials", "moving objects",
+    "loading", "unloading",
 
-    # Urban & city life
-    "cars moving on a busy road",
-    "a city street with people walking",
-    "someone at a market or bazaar",
-    "a person in a crowded place",
-    "someone at a sports stadium",
+    # Tech / device usage
+    "operating", "controlling",
+    "programming", "debugging",
 
-    # Art & crafts
-    "a person making handicrafts",
-    "someone knitting or sewing",
-    "a person sculpting or molding",
-    "someone doing calligraphy or writing",
-    "a person doing origami or folding",
-
-    # Generic descriptions (fallback)
-    "a person doing an activity",
-    "someone outdoors in daylight",
-    "an indoor scene with people",
-    "a person moving around",
-    "a close-up of an object or face",
-    "a person demonstrating something",
-    "someone interacting with objects",
-    "an outdoor nature scene",
-    "a sports or fitness activity",
-    "a cooking or food-related scene",
+    # Generic but useful
+    "moving", "interacting", "handling",
+    "demonstrating", "doing an activity"
 ]
-
-
 class CaptionDecoder:
     """
     Matches a segment feature vector to the best text caption
@@ -183,6 +262,7 @@ class CaptionDecoder:
         # Pre-encode all captions ONCE at startup (not for every segment)
         self.captions = CANDIDATE_CAPTIONS
         self.text_embeddings = self._encode_captions()
+        self.text_embeddings = self.text_embeddings.float()
         print(f"✅ CaptionDecoder ready: {len(self.captions)} candidate captions")
 
     def _encode_captions(self) -> torch.Tensor:

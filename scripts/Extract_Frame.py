@@ -6,12 +6,13 @@ import time
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # from models.SmolVLM import VLM_Generation
 from models.VLM_Generation import VLM_Generation
-VIDEO_DIR = "Video_embeddings/Videos"
+VIDEO_DIR = "Video_embeddings/MSRVTT_Videos/video"
 JSON_FILE = "data/video_event_captions.jsonl"
-OUTPUT_JSON_FILE = "data/video_event_final_captions.jsonl"
+OUTPUT_JSON_FILE = "data/video_event_new_tst_captions.jsonl"
 
 VLM = VLM_Generation()
 BATCH_SIZE = 16
+start = time.perf_counter()
 def time_to_seconds(t):
     return float(t.replace("s", ""))
 
@@ -51,16 +52,19 @@ def run_Caption_pipeline() :
             new_timeline = []
 
             batch_frames = []
+            batch_prompt = []
             batch_meta = []
 
             for segment in data["timeline"]:
                 start = time_to_seconds(segment["start"])
                 end = time_to_seconds(segment["end"])
-                # confidence = segment["confidence"]
-                # label = segment["caption"]
+                confidence = segment["confidence"]
+                label = segment["caption_check"]
+                VLM_PROMPT = ""
+                if(confidence > 0.2): 
+                    VLM_PROMPT = f" a scene of {label} "
                 mid = (start + end) / 2.0
                 frame = extract_frame(cap, mid, duration)
-
                 if frame is None:
                     # new_caption = label
                     new_timeline.append({
@@ -71,10 +75,10 @@ def run_Caption_pipeline() :
                     })
                     continue
                 batch_frames.append(frame)
+                batch_prompt.append(VLM_PROMPT)
                 batch_meta.append((segment))
-
                 if len(batch_frames) == BATCH_SIZE:
-                    captions = VLM.generate_batch(batch_frames)
+                    captions = VLM.generate_batch(batch_frames , batch_prompt)
 
                     for cap_text, (seg) in zip(captions, batch_meta):
                         new_timeline.append({
@@ -87,8 +91,7 @@ def run_Caption_pipeline() :
                     batch_meta.clear()
 
             if batch_frames:
-                captions = VLM.generate_batch(batch_frames)
-
+                captions = VLM.generate_batch(batch_frames , batch_prompt)
                 for cap_text, (seg) in zip(captions, batch_meta):
                     new_timeline.append({
                         "start": seg["start"],
