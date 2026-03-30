@@ -25,8 +25,31 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from models.st_adapter       import STAdapter
 from models.caption_decoder  import CaptionDecoder
+from models.event_head       import dynamic_segmentation
 
+# def evaluate_model(model):
+#     total_params = 0
+#     trainable_params = 0
 
+#     for p in model.parameters():
+#         num = p.numel()
+#         total_params += num
+#         if p.requires_grad:
+#             trainable_params += num
+
+#     size_mb = total_params * 4 / (1024 ** 2)  # float32 = 4 bytes
+
+#     print("📊 Model Summary")
+#     print(f"Total parameters     : {total_params:,}")
+#     print(f"Trainable parameters : {trainable_params:,}")
+#     print(f"Non-trainable params : {total_params - trainable_params:,}")
+#     print(f"Model size (MB)      : {size_mb:.2f} MB")
+
+#     return {
+#         "total": total_params,
+#         "trainable": trainable_params,
+#         "size_mb": size_mb
+#     }
 def segment_by_heuristics(feat_enriched: torch.Tensor, threshold: float = 0.4) -> list:
     """
     Step 3 - Event Segmentation based on visual changes.
@@ -68,7 +91,7 @@ def build_index(args):
     checkpoint  = args.checkpoint
     threshold   = args.threshold
     fps         = args.fps
-
+    device = "cuda" if torch.cuda.is_available() else "cpu"
     print("⚙️  Loading STAdapter...")
     st_adapter = STAdapter(config_path=config_path)
     if os.path.exists(checkpoint):
@@ -84,8 +107,9 @@ def build_index(args):
         print(f"   ✅ Loaded weights from {checkpoint}")
     else:
         print(f"   ⚠️  Using random STAdapter weights (No checkpoint found)")
+    st_adapter = st_adapter.to(device).float()
     st_adapter.eval()
-
+    # evaluate_model(st_adapter)
     print("🔤 Loading CaptionDecoder...")
     decoder = CaptionDecoder(device="cpu" if not torch.cuda.is_available() else "cuda")
 
@@ -112,13 +136,13 @@ def build_index(args):
             continue
 
         # Step 2: Temporal Modeling
-        feat_batched = feat.unsqueeze(0)
+        feat_batched = feat.unsqueeze(0).to(device).float()
         with torch.no_grad():
             feat_enriched = st_adapter(feat_batched).squeeze(0)  # (T, 512)
 
         # Step 3: Event Segmentation (Heuristic)
         frame_segments = segment_by_heuristics(feat_enriched, threshold=threshold)
-        
+        # frame_segments = dynamic_se
         timeline = []
         
         for (start_f, end_f) in frame_segments:
@@ -126,7 +150,7 @@ def build_index(args):
             seg_feat = feat_enriched[start_f:end_f+1].mean(dim=0)  # (512,)
             
             # # Step 4: Caption Generation
-            # caption, conf = decoder.decode(seg_feat)
+            caption_check, conf = decoder.decode(seg_feat.float().cpu())
             
             # Step 5 & 6 Info Prep
             start_time = round(start_f / fps, 2)
@@ -134,9 +158,9 @@ def build_index(args):
             
             timeline.append({
                 "start":      f"{start_time}s",
-                "end":        f"{end_time}s"
-                # "caption":    caption,
-                # "confidence": conf
+                "end":        f"{end_time}s" , 
+                "caption_check":    caption_check,
+                "confidence": conf
             })
             
             # Add to search index database
@@ -169,8 +193,8 @@ def build_index(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--feature_dir", default="embeddings1")
-    parser.add_argument("--checkpoint",  default="checkpoints/st_adapter.pt")
+    parser.add_argument("--feature_dir", default="Video_embeddings/embeddings_new")
+    parser.add_argument("--checkpoint",  default="checkpoints/st_adapter_contrastive.pt")
     parser.add_argument("--config",      default="configs/model_base.json")
     parser.add_argument("--limit",       type=int, default=None)
     parser.add_argument("--threshold",   type=float, default=0.2, help="Cosine distance threshold for scene split")

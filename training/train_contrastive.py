@@ -24,15 +24,7 @@ class MSRVTTCaptionDataset(Dataset):
         # Load the official MSR-VTT Retrieval JSON splits (list of dicts)
         # Format: [ {"video": "video1000.mp4", "caption": "a person cooking"}, ... ]
         with open(captions_json, 'r', encoding='utf-8') as f:
-            raw_data = json.load(f)
-            
-        # Convert list to an optimized dictionary: { "video1000": ["caption 1", "caption 2"] }
-        self.metadata = {}
-        for item in raw_data:
-            vid_id = item["video"].replace(".mp4", "")
-            if vid_id not in self.metadata:
-                self.metadata[vid_id] = []
-            self.metadata[vid_id].append(item["caption"])
+            self.metadata = json.load(f)
             
         # Only keep videos that physically exist in the embeddings folder AND have captions in the JSON
         available_files = [f for f in os.listdir(feature_dir) if f.endswith('.pt')]
@@ -192,7 +184,7 @@ if __name__ == "__main__":
     parser.add_argument("--checkpoint", default="checkpoints/st_adapter.pt", help="Warm start weights")
     parser.add_argument("--save_path", default="checkpoints/st_adapter_contrastive.pt", help="Where to save new weights")
     parser.add_argument("--config", default="configs/model_base.json")
-    parser.add_argument("--epochs", type=int, default=10)
+    parser.add_argument("--epochs", type=int, default=30)
     parser.add_argument("--batch_size", type=int, default=16)
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--from_scratch", action="store_true", help="Ignore existing checkpoints")

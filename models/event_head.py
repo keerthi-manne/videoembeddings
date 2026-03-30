@@ -65,7 +65,7 @@ def dynamic_segmentation(
     """
     T, D = x.shape
     if T <= 1:
-        return [{"start_idx": 0, "end_idx": T}]
+        return [{"start_idx": 0, "end_idx": T , "feat": x.mean(dim=0)}]
 
     # Normalize for cosine similarity
     x_norm = F.normalize(x, dim=-1)
