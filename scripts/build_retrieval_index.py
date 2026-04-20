@@ -18,6 +18,7 @@ import torch.nn.functional as F
 import os
 import sys
 import json
+import time 
 import argparse
 from tqdm import tqdm
 from Extract_Frame import run_Caption_pipeline
@@ -26,30 +27,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from models.st_adapter       import STAdapter
 from models.caption_decoder  import CaptionDecoder
 from models.event_head       import dynamic_segmentation
-
-# def evaluate_model(model):
-#     total_params = 0
-#     trainable_params = 0
-
-#     for p in model.parameters():
-#         num = p.numel()
-#         total_params += num
-#         if p.requires_grad:
-#             trainable_params += num
-
-#     size_mb = total_params * 4 / (1024 ** 2)  # float32 = 4 bytes
-
-#     print("📊 Model Summary")
-#     print(f"Total parameters     : {total_params:,}")
-#     print(f"Trainable parameters : {trainable_params:,}")
-#     print(f"Non-trainable params : {total_params - trainable_params:,}")
-#     print(f"Model size (MB)      : {size_mb:.2f} MB")
-
-#     return {
-#         "total": total_params,
-#         "trainable": trainable_params,
-#         "size_mb": size_mb
-#     }
+start = time.perf_counter()
 def segment_by_heuristics(feat_enriched: torch.Tensor, threshold: float = 0.4) -> list:
     """
     Step 3 - Event Segmentation based on visual changes.
@@ -178,7 +156,7 @@ def build_index(args):
 
     # Save JSONL Output (Step 5)
     os.makedirs('data', exist_ok=True)
-    with open("data/video_event_captions.jsonl", 'w') as f:
+    with open("data/final_video_event_captions.jsonl", 'w') as f:
         for entry in jsonl_results:
             f.write(json.dumps(entry) + '\n')
             
@@ -187,13 +165,15 @@ def build_index(args):
     # Get the captions and save it (Step 7)
     print("starting caption pipeline")
     run_Caption_pipeline()
+    end = time.perf_counter()
+    print("total time is " , end-start , " seconds ") 
     print(f"\n✅ Done! Captioned timelines saved → data/video_event_captions.jsonl")
     print(f"✅ Fast search index saved → data/retrieval_index.pt")
     print(f"   Indexed {len(retrieval_index)} total segment events across {len(jsonl_results)} videos.\n")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--feature_dir", default="Video_embeddings/embeddings_new")
+    parser.add_argument("--feature_dir", default="Video_embeddings/embeddings")
     parser.add_argument("--checkpoint",  default="checkpoints/st_adapter_contrastive.pt")
     parser.add_argument("--config",      default="configs/model_base.json")
     parser.add_argument("--limit",       type=int, default=None)
