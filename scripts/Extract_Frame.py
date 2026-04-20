@@ -7,12 +7,11 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # from models.SmolVLM import VLM_Generation
 from models.VLM_Generation import VLM_Generation
 VIDEO_DIR = "Video_embeddings/MSRVTT_Videos/video"
-JSON_FILE = "data/video_event_captions.jsonl"
+JSON_FILE = "data/final_video_event_captions.jsonl"
 OUTPUT_JSON_FILE = "data/video_event_new_tst_captions.jsonl"
 
 VLM = VLM_Generation()
 BATCH_SIZE = 16
-start = time.perf_counter()
 def time_to_seconds(t):
     return float(t.replace("s", ""))
 

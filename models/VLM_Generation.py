@@ -8,7 +8,8 @@ class VLM_Generation():
         self.processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
         self.processor.tokenizer.padding_side = "left"
         self.model = BlipForConditionalGeneration.from_pretrained(
-            "Salesforce/blip-image-captioning-base"
+            "Salesforce/blip-image-captioning-base",
+            use_safetensors=True
         )
 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
