@@ -90,8 +90,15 @@ def build_index(args):
     # evaluate_model(st_adapter)
     print("🔤 Loading CaptionDecoder...")
     decoder = CaptionDecoder(device="cpu" if not torch.cuda.is_available() else "cuda")
+    with open("Video_embeddings/modified_msrvtt_test_1k.json", "r") as f:
+        gt_data = json.load(f)
 
-    video_files = sorted([f for f in os.listdir(feature_dir) if f.endswith('.pt')])
+    videos_to_choose = set(gt_data.keys())  # faster lookup
+
+    video_files = sorted([
+        f for f in os.listdir(feature_dir)
+        if f.endswith('.pt') and f[:-3] in videos_to_choose
+    ])
     if args.limit:
         video_files = video_files[:args.limit]
 
@@ -156,7 +163,7 @@ def build_index(args):
 
     # Save JSONL Output (Step 5)
     os.makedirs('data', exist_ok=True)
-    with open("data/final_video_event_captions.jsonl", 'w') as f:
+    with open("data/final_testing_video_event_captions.jsonl", 'w') as f:
         for entry in jsonl_results:
             f.write(json.dumps(entry) + '\n')
             
@@ -173,7 +180,7 @@ def build_index(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--feature_dir", default="Video_embeddings/embeddings")
+    parser.add_argument("--feature_dir", default="Video_embeddings/grid_embeddings")
     parser.add_argument("--checkpoint",  default="checkpoints/st_adapter_contrastive.pt")
     parser.add_argument("--config",      default="configs/model_base.json")
     parser.add_argument("--limit",       type=int, default=None)

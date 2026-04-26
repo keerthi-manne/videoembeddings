@@ -5,10 +5,10 @@ import sys
 import time 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # from models.SmolVLM import VLM_Generation
-from models.VLM_Generation import VLM_Generation
+from models.florence_VLM import VLM_Generation
 VIDEO_DIR = "Video_embeddings/MSRVTT_Videos/video"
-JSON_FILE = "data/final_video_event_captions.jsonl"
-OUTPUT_JSON_FILE = "data/video_event_new_tst_captions.jsonl"
+JSON_FILE = "data/final_testing_video_event_captions.jsonl"
+OUTPUT_JSON_FILE = "data/final_video_event_new_tsting_captions.jsonl"
 
 VLM = VLM_Generation()
 BATCH_SIZE = 16
@@ -26,7 +26,7 @@ def extract_frame(cap, timestamp, duration):
     if not success:
         return None
 
-    frame = cv2.resize(frame, (224, 224))
+    frame = cv2.resize(frame, (448, 448))
     return frame
 
 def run_Caption_pipeline() : 
@@ -59,9 +59,9 @@ def run_Caption_pipeline() :
                 end = time_to_seconds(segment["end"])
                 confidence = segment["confidence"]
                 label = segment["caption_check"]
-                VLM_PROMPT = ""
-                if(confidence > 0.2): 
-                    VLM_PROMPT = f" a scene of {label} "
+                VLM_PROMPT = "<MORE_DETAILED_CAPTION>"
+                # if(confidence > 0.2): 
+                #     VLM_PROMPT = f"<DETAILED_CAPTION> {label}"
                 mid = (start + end) / 2.0
                 frame = extract_frame(cap, mid, duration)
                 if frame is None:
@@ -78,24 +78,37 @@ def run_Caption_pipeline() :
                 batch_meta.append((segment))
                 if len(batch_frames) == BATCH_SIZE:
                     captions = VLM.generate_batch(batch_frames , batch_prompt)
-
                     for cap_text, (seg) in zip(captions, batch_meta):
+                        label = seg["caption_check"]
+                        confidence = seg["confidence"]
+                        final_caption=cap_text
+                        if(confidence > 0.2): 
+                            final_caption = f"Action: {label}. Scene: {cap_text}"
                         new_timeline.append({
                             "start": seg["start"],
                             "end": seg["end"],
-                            "caption": cap_text
+                            "caption": final_caption
                         })
 
                     batch_frames.clear()
                     batch_meta.clear()
+                    batch_prompt.clear()
 
             if batch_frames:
+            
                 captions = VLM.generate_batch(batch_frames , batch_prompt)
-                for cap_text, (seg) in zip(captions, batch_meta):
+                for cap_text, seg in zip(captions, batch_meta):
+                    label = seg["caption_check"]
+                    confidence = seg["confidence"]
+
+                    final_caption = cap_text
+                    if confidence > 0.2:
+                        final_caption = f"Action: {label}. Scene: {cap_text}"
+
                     new_timeline.append({
                         "start": seg["start"],
                         "end": seg["end"],
-                        "caption": cap_text
+                        "caption": final_caption
                     })
 
             cap.release()

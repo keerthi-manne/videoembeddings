@@ -9,6 +9,9 @@ from PIL import Image
 from ImageEmbedding import process_image
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model, preprocess = clip.load("ViT-B/32", device=device)
+import sys 
+import os 
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # -----------------------------
 # Extract Frames
 # -----------------------------
@@ -163,9 +166,23 @@ def keyframes_to_embeddings(keyframes, model, preprocess, device):
 # -----------------------------
 # Run
 # -----------------------------
-video_keyframes = extract_keyframes("DTrailer.mp4")
-emb = keyframes_to_embeddings(  video_keyframes,
-    model,
-    preprocess,
-    device
-)
+# video_keyframes = extract_keyframes("DTrailer.mp4")
+# emb = keyframes_to_embeddings(  video_keyframes,
+#     model,
+#     preprocess,
+#     device
+# )
+for vid_num in range(0, 10000) : 
+    try : 
+        print(f"Processing video {vid_num}...")
+        video_keyframes = extract_keyframes(f"./Video_embeddings/MSRVTT_Videos/video/video{vid_num}.mp4")
+        video_emb = keyframes_to_embeddings(  video_keyframes,
+            model,
+            preprocess,
+            device
+        )
+        torch.save(video_emb , f"./Video_embeddings/grid_embeddings/video{vid_num}.pt")  
+        print(f"video {vid_num} Saved !! ")
+    except Exception as e:
+        print(f"❌ Error in video {vid_num}: {e}")
+        continue  
