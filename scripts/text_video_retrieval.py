@@ -1,78 +1,149 @@
 """
-scripts/text_video_retrieval.py - Phase 3 (Steps 7-8)
+scripts/text_video_retrieval.py
 
-1. Accepts user query.
-2. Encodes via CLIP text model to 512 dimensions.
-3. Computes similarity across all indexing vectors.
-4. Spits out most relevant hits.
+Hybrid Search = CLIP (semantic) + keyword matching
 
 Run:
-    python scripts/text_video_retrieval.py --query "person cooking food"
+python scripts/text_video_retrieval.py \
+    --query "people dressed as storm troopers"
 """
 
 import torch
 import torch.nn.functional as F
 import os
 import argparse
+import json
+import re
+from collections import Counter , defaultdict
+import clip
+from sentence_transformers import SentenceTransformer
+import numpy as np
 
-def search_index(index_path, query, top_k=5):
-    if not os.path.exists(index_path):
-        print(f"❌ Index not found at {index_path}. Run build_retrieval_index.py first!")
+# -------------------------
+# Load JSONL file
+# -------------------------
+def load_json(json_path):
+    if not os.path.exists(json_path):
+        print(f"❌ JSON file not found at {json_path}")
+        return None
+
+    data = []
+    with open(json_path, "r") as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                data.append(json.loads(line))
+
+    return data
+
+
+# -------------------------
+# Keyword scoring (improved)
+# -------------------------
+def clean_text(text):
+            return re.sub(r"[^\w\s]", "", text.lower()).strip()
+
+def keyword_score(query, caption):
+    q_words = re.findall(r"\w+", query)
+    c_words = re.findall(r"\w+", caption)
+
+    q_count = Counter(q_words)
+    c_count = Counter(c_words)
+
+    overlap = sum(min(q_count[w], c_count[w]) for w in q_count)
+    return overlap / (len(q_words) + 1e-6)
+
+
+# -------------------------
+# Main search function
+# -------------------------
+device = "cuda" if torch.cuda.is_available() else "cpu"
+model = SentenceTransformer('all-MiniLM-L6-v2', device=device)
+model.eval()
+def search_json(json_path, query, top_k=5):
+    data = load_json(json_path)
+    if data is None:
         return
-        print(f"❌ Index not found at {index_path}. Run build_retrieval_index.py first!")
-        return
-        
-    print("📂 Loading retrieval index...")
-    database = torch.load(index_path, map_location="cpu", weights_only=False)
-    if len(database) == 0:
-        print("❌ Database is empty!")
-        return
-        
-    print("🔤 Loading CLIP Text Encoder...")
-    import clip
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    model, _ = clip.load("ViT-B/32", device=device)
-    model.eval()
-    
+
+    # Load model ONCE
+
     print(f"\n🔍 Searching for: '{query}'\n")
-    
-    # Encode Query
-    tokens = clip.tokenize([query]).to(device)
-    with torch.no_grad():
-        query_emb = model.encode_text(tokens).squeeze(0) # (512,)
-        query_emb = F.normalize(query_emb, dim=-1).cpu()
-    
-    # Calculate Similarity for all events
+
+    # Encode query properly
+    query_clean = clean_text(query)
+    query_emb = model.encode(query_clean, normalize_embeddings=True)
+
     results = []
-    for event in database:
-        event_emb = event["segment_emb"]
-        event_emb = F.normalize(event_emb, dim=-1) # L2 normalize
-        
-        sim = (query_emb @ event_emb).item()
-        results.append((sim, event))
-        
-    # Sort top K
-    results.sort(key=lambda x: x[0], reverse=True)
-    top_results = results[:top_k]
-    
+
+    print("📊 Encoding captions & computing hybrid similarity...")
+
+    # -------------------------
+    # Loop through data
+    # -------------------------
+    for video in data:
+        vid = video["video_id"]
+
+        for seg in video["timeline"]:
+            caption = seg.get("caption", "").strip()
+
+            # ❌ Skip bad captions
+            if not caption or caption.lower() in ["no caption available", "none", "n/a"]:
+                continue
+
+            caption_clean = clean_text(caption)
+
+            # ✅ Correct encoding (NO tokenization)
+            emb = model.encode(caption_clean, normalize_embeddings=True)
+
+            # -------------------------
+            # Hybrid scoring
+            # -------------------------
+            semantic_sim = float(query_emb @ emb)
+            kw_score = keyword_score(query_clean, caption_clean)
+
+            alpha = 0.8  # semantic weight
+            beta = 0.2   # keyword weight
+
+            sim = alpha * semantic_sim + beta * kw_score
+
+            results.append({
+                "similarity": sim,
+                "semantic": semantic_sim,
+                "keyword": kw_score,
+                "video_id": vid,
+                "start": seg["start"],
+                "end": seg["end"],
+                "caption": caption
+            })
+
+    # -------------------------
+    # Sort results
+    # -------------------------
+    results = sorted(results, key=lambda x: x["similarity"], reverse=True)[:top_k]
+
+    # -------------------------
+    # Print results
+    # -------------------------
     print("─────────────────────────────────────────────────────")
     print(f"🏆 Top {top_k} results for: '{query}'")
     print("─────────────────────────────────────────────────────")
-    
-    for rank, (sim, event) in enumerate(top_results, 1):
-        vid   = event["video_id"]
-        start = event["start_time"]
-        end   = event["end_time"]
-        
-        # We fetch the exact caption generation logic just to show the original Phase 2 caption on screen
-        print(f"#{rank}  |  {vid:<12} |  [{start}s – {end}s]  |  Similarity: {sim:.3f}")
-        
+
+    for i, res in enumerate(results, 1):
+        print(f"#{i} | {res['video_id']} | [{res['start']} – {res['end']}]")
+        print(f"     Final Score: {res['similarity']:.3f}")
+        print(f"     (Semantic: {res['semantic']:.3f}, Keyword: {res['keyword']:.3f})\n")
+
     print("─────────────────────────────────────────────────────")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--query", type=str, required=True, help="Text query to search for")
-    parser.add_argument("--index", default="data/retrieval_index.pt", help="Path to database index")
-    parser.add_argument("--top_k", type=int, default=5, help="Number of results to show")
+    parser.add_argument("--query", type=str, required=True)
+    parser.add_argument(
+        "--json",
+        default="data/final_video_event_new_tsting_captions.jsonl",
+        help="Path to JSONL captions file"
+    )
+    parser.add_argument("--top_k", type=int, default=5)
+
     args = parser.parse_args()
-    search_index(args.index, args.query, args.top_k)
+    search_json(args.json, args.query, args.top_k)
